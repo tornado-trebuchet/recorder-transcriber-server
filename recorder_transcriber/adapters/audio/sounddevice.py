@@ -114,7 +114,6 @@ class AudioRecorderAdapter:
         if target_channels < 1:
             raise ValueError("Configured channel count must be >= 1")
 
-        # Downmix or duplicate channels as required.
         if working.shape[1] == target_channels:
             channel_matched = working
         elif target_channels == 1:
