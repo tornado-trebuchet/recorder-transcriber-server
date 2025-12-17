@@ -1,24 +1,27 @@
 ffmpeg:
-	binary: ffmpeg
-	input_format: f32le
-	sample_rate: 16000
-	channels: 1
-	extra_args: []
+    binary: ffmpeg
+    input_format: f32le
+    sample_rate: 16000
+    channels: 1
+    output_codec: pcm_s16le
+    audio_format: wav
+    dtype: float32
 
 audio:
-	samplerate: 16000
-	channels: 2
-	blocksize: 1024
-	dtype: float32
+    samplerate: 16000
+    channels: 2
+    blocksize: 1024
+    dtype: float32
+
+recording:
+    max_duration_seconds: 300
 
 whisper:
-	model: base
-	device: cpu
-	download_root: ~/.cache/whisper
+    model: base
+    device: cpu
+    download_root: ~/.cache/whisper
 
 llm:
-	base_url: http://localhost:8000/v1
-	model: gpt-4o-mini
-	temperature: 0.2
-	max_tokens: 800
-	timeout: 30
+    base_url: http://localhost:1641/v1
+    model: gpt-4o-mini
+    temperature: 0.2

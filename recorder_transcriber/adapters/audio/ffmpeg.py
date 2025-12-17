@@ -1,12 +1,13 @@
 import subprocess
+import numpy as np
+from uuid import uuid4
 from pathlib import Path
-from typing import Iterable
 
 from recorder_transcriber.config import config
+from recorder_transcriber.model import Recording
 
 
 class AudioConverterAdapter:
-    """Wraps ffmpeg CLI. Default output: WAV (pcm_s16le), 16 kHz, mono."""
 
     def __init__(self) -> None:
         ff = config.ffmpeg
@@ -14,75 +15,53 @@ class AudioConverterAdapter:
         self.input_format: str = str(ff["input_format"])
         self.sample_rate: int = int(ff["sample_rate"])
         self.channels: int = int(ff["channels"])
-        self.extra_args: list[str] = [str(a) for a in ff.get("extra_args", [])]
-        self.tmp_dir = Path(config.tmp_dir).expanduser()
-        self.tmp_dir.mkdir(parents=True, exist_ok=True)
+        self.output_codec: str = str(ff["output_codec"])
+        self.audio_format: str = str(ff["audio_format"])
+        self.dtype: str = str(ff["dtype"])
+        self.tmp_dir = Path(config.tmp_dir)
 
-    def convert_file(self, src: str | Path, dst: str | Path | None = None) -> Path:
-        src_path = Path(src)
-        if not src_path.exists():
-            raise FileNotFoundError(src_path)
+    def save_recording(self, recording: Recording) -> Recording:
+        data = recording.data
+        if data is None:
+            raise
+        
+        if data.ndim == 1:
+            if recording.channels != 1:
+                raise ValueError("Mono ndarray but recording.channels != 1")
+        elif data.ndim == 2:
+            if data.shape[1] == recording.channels:
+                pass  # (frames, channels) as expected
+            elif data.shape[0] == recording.channels:
+                data = data.T  # (channels, frames) -> (frames, channels)
+            else:
+                raise ValueError("ndarray channels do not match recording.channels")
+        else:
+            raise ValueError("Recording.data must be 1D or 2D ndarray")
 
-        dst_path = Path(dst) if dst is not None else self.tmp_dir / f"{src_path.stem}.wav"
+        np_dtype = np.dtype(self.dtype)
+        data = data.astype(np_dtype, copy=False)
 
-        cmd = [
+        ext = self.audio_format.lstrip(".")
+        out_path = self.tmp_dir / f"rec-{uuid4().hex}.{ext}"
+
+        ffmpeg_cmd = [
             self.ffmpeg_bin,
             "-y",
-            "-i",
-            str(src_path),
-            "-ac",
-            str(self.channels),
-            "-ar",
-            str(self.sample_rate),
-            "-acodec",
-            "pcm_s16le",
-            *self.extra_args,
-            str(dst_path),
+            "-f", self.input_format,
+            "-ar", str(recording.sample_rate),
+            "-ac", str(recording.channels),
+            "-i", "pipe:0",
+            "-c:a", self.output_codec,
+            str(out_path),
         ]
-        self._run(cmd)
-        return dst_path
 
-    def convert_bytes(self, pcm_bytes: bytes) -> bytes:
-        """Convert raw PCM input to WAV bytes."""
+        proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdin_bytes = data.tobytes()
+        _, stderr = proc.communicate(input=stdin_bytes)
 
-        cmd = [
-            self.ffmpeg_bin,
-            "-f",
-            self.input_format,
-            "-ar",
-            str(self.sample_rate),
-            "-ac",
-            str(self.channels),
-            "-i",
-            "-",
-            "-acodec",
-            "pcm_s16le",
-            "-f",
-            "wav",
-            *self.extra_args,
-            "-",
-        ]
-        return self._run_capture(cmd, pcm_bytes)
-
-    def convert_iter(self, frames: Iterable[bytes]) -> bytes:
-        """Convert streamed PCM chunks to WAV bytes."""
-        pcm_bytes = b"".join(frames)
-        return self.convert_bytes(pcm_bytes)
-
-    @staticmethod
-    def _run(cmd: list[str]) -> None:
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if proc.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed: {proc.stderr.decode(errors='ignore')}")
+            raise RuntimeError(f"ffmpeg failed: {stderr.decode(errors='replace')}")
 
-    @staticmethod
-    def _run_capture(cmd: list[str], stdin_bytes: bytes) -> bytes:
-        proc = subprocess.run(
-            cmd,
-            input=stdin_bytes,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if proc.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed: {proc.stderr.decode(errors='ignore')}")
-        return proc.stdout
+        recording.path = out_path
+        recording.drop_in_memory_payload()
+        return recording

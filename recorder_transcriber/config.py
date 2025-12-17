@@ -22,11 +22,16 @@ class Config:
 
         raw = self._load_yaml(config_path)
 
-        self.config_dir: str = self._require_env("CONFIG_DIR")
+        self.config_dir: str = self._require_env("CONFIG_PATH")
         self.fsdir: str = self._require_env("FS_DIR")
         self.llm_server: str = self._require_env("LLM_SERVER")
         self.server_addr: str = self._require_env("SERVER_ADDR")
-        self.tmp_dir: str = self._require_env("TMP_DIR")
+        self.server_port: int = int(self._require_env("SERVER_PORT"))
+
+        tmp_dir_env = self._require_env("TMP_DIR")
+        tmp_path = Path(tmp_dir_env).expanduser()
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        self.tmp_dir = str(tmp_path)
 
         audio = self._require_mapping(raw, "audio")
         self.audio: dict[str, Any] = {
@@ -36,23 +41,28 @@ class Config:
             "dtype": str(self._require_value(audio, "dtype")),
         }
 
+        recording = self._require_mapping(raw, "recording")
+        self.recording: dict[str, Any] = {
+            "max_duration_seconds": int(self._require_value(recording, "max_duration_seconds"))
+        }
+        self.recording_max_seconds: int = int(self.recording["max_duration_seconds"])
+
         ffmpeg = self._require_mapping(raw, "ffmpeg")
-        extra_args = self._require_sequence(ffmpeg, "extra_args")
         self.ffmpeg: dict[str, Any] = {
             "binary": str(self._require_value(ffmpeg, "binary")),
             "input_format": str(self._require_value(ffmpeg, "input_format")),
             "sample_rate": int(self._require_value(ffmpeg, "sample_rate")),
             "channels": int(self._require_value(ffmpeg, "channels")),
-            "extra_args": list(extra_args),
+            "output_codec": str(self._require_value(ffmpeg, "output_codec")),
+            "audio_format": str(self._require_value(ffmpeg, "audio_format")),
+            "dtype": str(self._require_value(ffmpeg, "dtype")),
         }
 
         whisper = self._require_mapping(raw, "whisper")
         self.whisper: dict[str, Any] = {
             "model": str(self._require_value(whisper, "model")),
-            # Device is optional; default to CPU for local inference.
             "device": str(whisper.get("device", "cpu")),
-            # Where to download/cache weights; defaults to CONFIG_DIR.
-            "download_root": str(whisper.get("download_root", self.config_dir)),
+            "download_root": str(whisper.get("download_root")),
         }
 
         llm = self._require_mapping(raw, "llm")

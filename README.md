@@ -3,12 +3,11 @@
 
 ## Endpoints
 
-/record
+/start_recording
+/stop_recording
 /transcribe
-/record_transcribe
 /enhance
-/transcribe_enhance
-/record_transcribe_enhance
+
 
 
 ## Performance 
@@ -19,4 +18,4 @@ CPU only for local models
 
 ### Linux
 
-PulseAudio -> Transcription Model -> Enhancement Model -> Ruturn formatted text at the endpoint 
+Audio -> Transcription Model -> Enhancement Model -> Ruturn formatted text at the endpoint 
