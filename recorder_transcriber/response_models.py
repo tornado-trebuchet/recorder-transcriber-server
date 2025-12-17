@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Literal
 
@@ -46,7 +44,6 @@ class TranscriptResponse(BaseModel):
 
 	recording_id: str
 	text: str
-	language: str | None
 	generated_at: datetime
 
 	@classmethod
@@ -54,7 +51,6 @@ class TranscriptResponse(BaseModel):
 		return cls(
 			recording_id=recording_id,
 			text=transcript.text,
-			language=transcript.language,
 			generated_at=transcript.generated_at,
 		)
 
