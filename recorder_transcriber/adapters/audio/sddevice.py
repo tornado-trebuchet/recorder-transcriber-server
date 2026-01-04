@@ -2,7 +2,7 @@ from typing import Any
 
 import queue
 import numpy as np
-import sounddevice as sd
+import sounddevice
 
 from recorder_transcriber.config import config
 from recorder_transcriber.model import Recording
@@ -22,17 +22,16 @@ class AudioRecorderAdapter:
         self.dtype = dtype
 
         self._queue: queue.Queue[np.ndarray] = queue.Queue()
-        self._stream: sd.InputStream | None = None
+        self._stream: sounddevice.InputStream | None = None
         self._selected_device_name: str | None = None
 
     def start(self) -> None:
         if self._stream:
             return
 
-        device_name = self._get_device()
-        self._selected_device_name = device_name
+        self._get_device()
 
-        self._stream = sd.InputStream(
+        self._stream = sounddevice.InputStream(
             callback=self._callback,
         )
         self._stream.start()
@@ -157,6 +156,6 @@ class AudioRecorderAdapter:
 
     def _get_device(self) -> None :
         """ Look here for a bug"""
-        self._selected_device_name = str(sd.query_devices(0).get("name"))
-        index = sd.query_devices('pulse').get("index")
-        sd.default.device = index, None
+        self._selected_device_name = str(sounddevice.query_devices(0).get("name"))
+        index = sounddevice.query_devices('pulse').get("index")
+        sounddevice.default.device = index, None

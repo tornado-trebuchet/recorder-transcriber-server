@@ -1,6 +1,6 @@
 from recorder_transcriber.config import config
 from recorder_transcriber.adapters.audio.ffmpeg import AudioConverterAdapter
-from recorder_transcriber.adapters.audio.sounddevice import AudioRecorderAdapter
+from recorder_transcriber.adapters.audio.sddevice import AudioRecorderAdapter
 from recorder_transcriber.adapters.speech_to_text.whisper import WhisperAdapter
 from recorder_transcriber.adapters.text_to_text.localllm import TextEnhancer
 from recorder_transcriber.services.recorder import RecorderService

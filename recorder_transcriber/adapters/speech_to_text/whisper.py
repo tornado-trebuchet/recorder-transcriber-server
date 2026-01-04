@@ -13,7 +13,7 @@ class WhisperAdapter:
 		wcfg = config.whisper
 		self.model_name: str = wcfg["model"]
 		self.device: str = wcfg.get("device", "gpu")
-		self.download_root: str = wcfg.get("download_root")
+		self.download_root: str = wcfg.get("download_root", "")
 		self._model: Any = None
 		self.target_sample_rate: int = int(config.audio.get("samplerate", 16000))
 

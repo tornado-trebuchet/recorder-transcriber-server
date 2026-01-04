@@ -63,5 +63,5 @@ class AudioConverterAdapter:
             raise RuntimeError(f"ffmpeg failed: {stderr.decode(errors='replace')}")
 
         recording.path = out_path
-        recording.drop_in_memory_payload()
+        recording.clear_data()
         return recording

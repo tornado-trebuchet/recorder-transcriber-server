@@ -23,8 +23,8 @@ class Recording:
         if self.data is None and self.path is None:
             raise ValueError("Recording requires either in-memory data or a filesystem path")
 
-    def drop_in_memory_payload(self) -> None:
-        """Release numpy payload when persisted as file to reclaim memory."""
+    def clear_data(self) -> None:
+        """Set bytes free when not needed."""
         if self.path is None:
             raise ValueError("Cannot drop payload without a backing path")
         self.data = None
