@@ -12,7 +12,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from recorder_transcriber.config import config
 from recorder_transcriber.model import Note
 
-create_agent = lc_agents.create_agent # type: ignore
+create_agent = lc_agents.create_agent
 
 class EnhancedTranscript(BaseModel):
     markdown: str = Field(
@@ -31,18 +31,18 @@ class TextEnhancer:
         self.cfg = config
         llm_cfg = self.cfg.llm
 
-        model: BaseChatModel = init_chat_model( # type: ignore
+        model: BaseChatModel = init_chat_model(
                 llm_cfg["model"],
-                temperature=llm_cfg.get("temperature", 0.4),
+                temperature=llm_cfg.get("temperature", 0.2),
                 timeout=llm_cfg.get("timeout", 160),
                 base_url=llm_cfg.get("base_url"),
                 api_key="not-needed"
             )
         
-        self._model = model # type: ignore
+        self._model = model
 
         self._agent: Any = create_agent(
-            model=self._model, # type: ignore
+            model=self._model,
             system_prompt="You clean up spoken transcripts into clear Markdown and extract 3-5 topical tags and title from the content. Provide both outputs in the required structured format.",
             response_format=ToolStrategy(
                 schema=EnhancedTranscript,

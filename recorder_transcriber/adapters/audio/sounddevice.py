@@ -2,7 +2,7 @@ from typing import Any
 
 import queue
 import numpy as np
-import sounddevice as sd  # type: ignore
+import sounddevice as sd
 
 from recorder_transcriber.config import config
 from recorder_transcriber.model import Recording
@@ -157,5 +157,6 @@ class AudioRecorderAdapter:
 
     def _get_device(self) -> None :
         """ Look here for a bug"""
-        sd.default.device = 0, None # type: ignore
-        self._selected_device_name = str(sd.query_devices(0).get("name")) # type: ignore
+        self._selected_device_name = str(sd.query_devices(0).get("name"))
+        index = sd.query_devices('pulse').get("index")
+        sd.default.device = index, None

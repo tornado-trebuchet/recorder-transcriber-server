@@ -30,7 +30,7 @@ class AudioConverterAdapter:
                 raise ValueError("Mono ndarray but recording.channels != 1")
         elif data.ndim == 2:
             if data.shape[1] == recording.channels:
-                pass  # (frames, channels) as expected
+                pass
             elif data.shape[0] == recording.channels:
                 data = data.T  # (channels, frames) -> (frames, channels)
             else:

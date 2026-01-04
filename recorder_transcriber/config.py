@@ -25,8 +25,6 @@ class Config:
         self.config_dir: str = self._require_env("CONFIG_PATH")
         self.fsdir: str = self._require_env("FS_DIR")
         self.llm_server: str = self._require_env("LLM_SERVER")
-        self.server_addr: str = self._require_env("SERVER_ADDR")
-        self.server_port: int = int(self._require_env("SERVER_PORT"))
 
         tmp_dir_env = self._require_env("TMP_DIR")
         tmp_path = Path(tmp_dir_env).expanduser()
@@ -59,10 +57,12 @@ class Config:
         }
 
         whisper = self._require_mapping(raw, "whisper")
+        download_root_raw = whisper.get("download_root")
+        download_root_expanded = str(Path(download_root_raw).expanduser()) if download_root_raw else None
         self.whisper: dict[str, Any] = {
             "model": str(self._require_value(whisper, "model")),
-            "device": str(whisper.get("device", "cpu")),
-            "download_root": str(whisper.get("download_root")),
+            "device": str(whisper.get("device", "gpu")),
+            "download_root": download_root_expanded,
         }
 
         llm = self._require_mapping(raw, "llm")

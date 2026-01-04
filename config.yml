@@ -17,9 +17,9 @@ recording:
     max_duration_seconds: 300
 
 whisper:
-    model: base
+    model: medium
     device: cpu
-    download_root: ~/.cache/whisper
+    download_root: ~/.cache/huggingface
 
 llm:
     base_url: http://localhost:1641/v1

@@ -36,7 +36,7 @@ class Transcript:
 
     text: str
     recording_path: Path | None = None
-    language: str | None = None
+    # language: str | None = None
     generated_at: datetime = field(default_factory=_utcnow)
 
 

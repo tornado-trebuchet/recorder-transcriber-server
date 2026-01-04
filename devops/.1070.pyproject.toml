@@ -3,16 +3,23 @@ name = "recorder-transcriber-server"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9,<3.11"
 dependencies = [
     "dotenv>=0.9.9",
-    "numpy>=2.3.5",
+    "numpy>=1.21,<2.0",
     "pyyaml>=6.0.3",
     "sounddevice>=0.5.3",
-    "faster-whisper>=1.1.0",
+    "openai-whisper>=20240930",
     "langchain>=0.3.0",
     "langchain-openai>=0.2.0",
     "pydantic>=2.7.0",
     "fastapi>=0.124.4",
     "uvicorn>=0.38.0",
+    "torch==1.12.1"
 ]
+
+[[index]]
+name = "pytorch-cu113"
+url = "https://download.pytorch.org/whl/cu113"
+explicit = true
+
