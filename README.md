@@ -16,4 +16,4 @@ All timestamps are ISO 8601 strings. `recording_id` doubles as the file path pro
 # Notes  
 - Uses pulse as audio backend (at least looks for pulse devices)
 - Requires a local openai-compatible llm server for enhancement
-- Container is compatible with older cuda versions to run whisper on Nvidia Pascal GPUs 
+- Container is compatible with older cuda versions to run whisper on Nvidia Pascal GPUs (Image is work in progress, currently incompatibilities are raging)
