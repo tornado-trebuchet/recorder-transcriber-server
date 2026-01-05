@@ -1,11 +1,13 @@
 from pathlib import Path
+from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 
 from recorder_transcriber.model import Transcript
 from recorder_transcriber.response_models import (
     EnhancementRequest,
     EnhancementResponse,
+	OrchestratorStatusResponse,
     RecordingResponse,
     StartRecordingResponse,
     TranscriptResponse,
@@ -13,17 +15,44 @@ from recorder_transcriber.response_models import (
 )
 
 from recorder_transcriber.services.enhancer import EnhancementService
+from recorder_transcriber.services.orchestrator import OrchestratorService
 from recorder_transcriber.services.recorder import RecorderService
 from recorder_transcriber.services.transcriber import TranscriptionService
 
+from recorder_transcriber.configuration import load_config
 from recorder_transcriber.di import (
+	build_container,
     get_recorder_service,
     get_transcription_service,
     get_enhancement_service,
+	get_orchestrator_service,
 )
 
 
-app = FastAPI(title="recorder-transcriber", version="0.1.0")
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+	cfg = load_config()
+	app.state.container = build_container(cfg)
+	try:
+		yield
+	finally:
+		container = getattr(app.state, "container", None)
+		if container is not None:
+			try:
+				container.shutdown()
+			except Exception:
+				pass
+
+
+app = FastAPI(title="recorder-transcriber", version="0.1.0", lifespan=_lifespan)
+
+
+
+def _orchestrator_dep(request: Request) -> OrchestratorService:
+	try:
+		return get_orchestrator_service(request)
+	except RuntimeError as exc:
+		raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
 @app.post("/start_recording", response_model=StartRecordingResponse)
@@ -71,3 +100,30 @@ def enhance(
 	transcript = Transcript(text=payload.text, recording_path=recording_path)
 	note = enhancer.enhance(transcript)
 	return EnhancementResponse.from_note(note, recording_id=payload.recording_id)
+
+
+@app.post("/orchestrator/start", response_model=OrchestratorStatusResponse)
+def start_orchestrator(
+	orchestrator: OrchestratorService = Depends(_orchestrator_dep),
+) -> OrchestratorStatusResponse:
+	try:
+		status_obj = orchestrator.start()
+	except RuntimeError as exc:
+		raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+	return OrchestratorStatusResponse.from_status(status_obj)
+
+
+@app.post("/orchestrator/stop", response_model=OrchestratorStatusResponse)
+def stop_orchestrator(
+	orchestrator: OrchestratorService = Depends(_orchestrator_dep),
+) -> OrchestratorStatusResponse:
+	status_obj = orchestrator.stop()
+	return OrchestratorStatusResponse.from_status(status_obj)
+
+
+@app.get("/orchestrator/status", response_model=OrchestratorStatusResponse)
+def orchestrator_status(
+	orchestrator: OrchestratorService = Depends(_orchestrator_dep),
+) -> OrchestratorStatusResponse:
+	status_obj = orchestrator.status()
+	return OrchestratorStatusResponse.from_status(status_obj)

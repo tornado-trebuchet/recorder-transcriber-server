@@ -2,26 +2,27 @@ from typing import Any
 
 import queue
 import numpy as np
-import sounddevice
-
-from recorder_transcriber.config import config
+import sounddevice # type: ignore
 from recorder_transcriber.model import Recording
 
 class AudioRecorderAdapter:
 
     def __init__(
         self,
-        samplerate: int = config.audio["samplerate"],
-        channels: int = config.audio["channels"],
-        blocksize: int = config.audio["blocksize"],
-        dtype: str = config.audio["dtype"],
+        *,
+        samplerate: int,
+        channels: int,
+        blocksize: int,
+        dtype: str,
+        queue_max_chunks: int | None = None,
     ) -> None:
         self.samplerate = samplerate
         self.channels = channels
         self.blocksize = blocksize
         self.dtype = dtype
 
-        self._queue: queue.Queue[np.ndarray] = queue.Queue()
+        maxsize = 0 if queue_max_chunks is None else max(0, int(queue_max_chunks))
+        self._queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=maxsize)
         self._stream: sounddevice.InputStream | None = None
         self._selected_device_name: str | None = None
 
@@ -32,10 +33,13 @@ class AudioRecorderAdapter:
         self._get_device()
 
         self._stream = sounddevice.InputStream(
+            samplerate=self.samplerate,
+            channels=self.channels,
+            blocksize=self.blocksize,
+            dtype=self.dtype,
             callback=self._callback,
         )
         self._stream.start()
-        print("starting")
 
     def stop(self) -> Recording | None:
         """Stop recording, drain queued frames and return a Recording"""
@@ -58,6 +62,25 @@ class AudioRecorderAdapter:
             return None
         payload = self._resample(payload, input_samplerate)
         return self._build_recording(payload)
+
+    def is_running(self) -> bool:
+        return self._stream is not None
+
+    def read_chunk(self, timeout_seconds: float | None = None) -> np.ndarray | None:
+        """Return the next queued audio chunk."""
+        try:
+            if timeout_seconds is None:
+                return self._queue.get_nowait()
+            return self._queue.get(timeout=max(timeout_seconds, 0.0))
+        except queue.Empty:
+            return None
+
+    def clear_buffer(self) -> None:
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
 
     def _build_recording(self, payload: np.ndarray) -> Recording:
         return Recording(
@@ -155,7 +178,7 @@ class AudioRecorderAdapter:
         return output
 
     def _get_device(self) -> None :
-        """ Look here for a bug"""
+        """Look here for a bug"""
         self._selected_device_name = str(sounddevice.query_devices(0).get("name"))
         index = sounddevice.query_devices('pulse').get("index")
         sounddevice.default.device = index, None

@@ -18,10 +18,23 @@ recording:
 
 whisper:
     model: medium
-    device: cpu
+    device: cuda
     download_root: ~/.cache/huggingface
 
 llm:
     base_url: http://localhost:1641/v1
     model: gpt-4o-mini
     temperature: 0.2
+
+listener:
+    wake_window_seconds: 2.0
+    wake_frame_ms: 80
+    wake_threshold: 0.5
+    wake_models: [alexa]
+    wake_model_dir: ./scripts/openww/models/
+    vad_threshold: 0.5
+    vad_min_silence_ms: 250
+    vad_speech_pad_ms: 30
+    armed_timeout_seconds: 5.0
+    max_utterance_seconds: 20.0
+    end_hangover_ms: 300

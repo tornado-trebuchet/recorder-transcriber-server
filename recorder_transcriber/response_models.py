@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, ConfigDict
 
 from recorder_transcriber.model import Note, Recording, Transcript
+from recorder_transcriber.services.orchestrator import OrchestratorStatus
 
 
 class StartRecordingResponse(BaseModel):
@@ -74,3 +75,25 @@ class EnhancementResponse(BaseModel):
 	@classmethod
 	def from_note(cls, note: Note, recording_id: str | None = None) -> "EnhancementResponse":
 		return cls(body=note.body, title=note.title, tags=note.tags, created_at=note.created_at, recording_id=recording_id)
+
+
+class OrchestratorStatusResponse(BaseModel):
+	model_config = ConfigDict(extra="forbid")
+
+	running: bool
+	phase: Literal["idle", "armed", "recording", "stopping", "error"]
+	started_at: datetime | None
+	last_wake_at: datetime | None
+	last_recording_id: str | None
+	last_error: str | None
+
+	@classmethod
+	def from_status(cls, status: OrchestratorStatus) -> "OrchestratorStatusResponse":
+		return cls(
+			running=status.running,
+			phase=status.phase,
+			started_at=status.started_at,
+			last_wake_at=status.last_wake_at,
+			last_recording_id=status.last_recording_id,
+			last_error=status.last_error,
+		)

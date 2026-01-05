@@ -3,7 +3,7 @@ name = "recorder-transcriber-server"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11,<4.0"
 dependencies = [
     "dotenv>=0.9.9",
     "numpy>=2.3.5",
@@ -17,10 +17,15 @@ dependencies = [
     "uvicorn>=0.38.0",
     "mypy>=1.19.1",
     "pip>=25.3",
+    "openwakeword>=0.6.0",
+    "silero-vad>=6.2.0",
+    "types-pyyaml>=6.0.12.20250915",
 ]
 
-[tool.mypy]
-python_version = "3.12"
+[mypy]
+python_version = "3.11"
 strict = true
 ignore_missing_imports = true
 warn_unused_configs = true
+warn_return_any = true
+disallow_untyped_defs = true

@@ -1,8 +1,9 @@
+from typing import Literal
 from dataclasses import dataclass, field
+
 from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
-
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -48,3 +49,14 @@ class Note:
     title: str
     tags: list[str]
     created_at: datetime = field(default_factory=_utcnow)
+
+@dataclass(frozen=True, slots=True)
+class WakeResult:
+	detected: bool
+	scores: dict[str, float]
+
+VadEventType = Literal["speech_start", "speech_end"]
+
+@dataclass(frozen=True, slots=True)
+class VadEvent:
+	kind: VadEventType

@@ -70,12 +70,16 @@ class RecorderService:
 			raise RuntimeError("Recorder returned no audio data")
 
 		persisted = self.storage_adapter.save_recording(raw)
-		if persisted.path is None:
-			raise RuntimeError("Recorder failed to persist audio")
-
-		recording_id = str(persisted.path)
-		self._recordings[recording_id] = persisted
+		self.store_recording(persisted)
 		return persisted
+
+	def store_recording(self, recording: Recording) -> str:
+		"""Register an already-persisted recording in the in-memory registry."""
+		if recording.path is None:
+			raise RuntimeError("Recording must have a path to be stored")
+		recording_id = str(recording.path)
+		self._recordings[recording_id] = recording
+		return recording_id
 
 	def get_recording(self, recording_id: str) -> Recording:
 		try:

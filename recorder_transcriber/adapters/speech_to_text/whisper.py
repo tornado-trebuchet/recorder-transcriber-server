@@ -2,20 +2,25 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from faster_whisper import WhisperModel
-
-from recorder_transcriber.config import config
+from faster_whisper import WhisperModel # type: ignore
 from recorder_transcriber.model import Recording, Transcript
 
 
 class WhisperAdapter:
-	def __init__(self) -> None:
-		wcfg = config.whisper
-		self.model_name: str = wcfg["model"]
-		self.device: str = wcfg.get("device", "gpu")
-		self.download_root: str = wcfg.get("download_root", "")
+	def __init__(
+		self,
+		*,
+		model_name: str,
+		device: str,
+		download_root: str | None = None,
+		target_sample_rate: int = 16000,
+	) -> None:
+		self.model_name = str(model_name)
+		self.device = str(device)
+		dl = "" if download_root is None else str(download_root)
+		self.download_root = dl
 		self._model: Any = None
-		self.target_sample_rate: int = int(config.audio.get("samplerate", 16000))
+		self.target_sample_rate = int(target_sample_rate)
 
 	@staticmethod
 	def _extract_text(segments: Any, info: Any) -> str:

@@ -3,13 +3,12 @@ from typing import Any
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
-import langchain.agents as lc_agents
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain.agents.structured_output import ToolStrategy
 from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
-from langchain_core.language_models.chat_models import BaseChatModel
+import langchain.agents as lc_agents
 
-from recorder_transcriber.config import config
 from recorder_transcriber.model import Note
 
 create_agent = lc_agents.create_agent
@@ -27,19 +26,23 @@ class EnhancedTranscript(BaseModel):
     tags: list[str] = Field(description="3-4 comma-safe topical tag strings ordered by relevance.", min_length=3, max_length=5)
 
 class TextEnhancer:
-    def __init__(self) -> None:
-        self.cfg = config
-        llm_cfg = self.cfg.llm
-
-        model: BaseChatModel = init_chat_model(
-                llm_cfg["model"],
-                temperature=llm_cfg.get("temperature", 0.2),
-                timeout=llm_cfg.get("timeout", 160),
-                base_url=llm_cfg.get("base_url"),
-                api_key="not-needed"
-            )
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        model: str,
+        temperature: float = 0.2,
+        timeout: int = 160,
+    ) -> None:
+        model_obj: BaseChatModel = init_chat_model(
+            str(model),
+            temperature=float(temperature),
+            timeout=int(timeout),
+            base_url=str(base_url),
+            api_key="not-needed",
+        )
         
-        self._model = model
+        self._model = model_obj
 
         self._agent: Any = create_agent(
             model=self._model,

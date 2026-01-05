@@ -74,6 +74,46 @@ class Config:
             "timeout": int(llm.get("timeout", 30)),
         }
 
+        listener_raw = raw.get("listener", {})
+        if listener_raw is None:
+            listener_raw = {}
+        if not isinstance(listener_raw, Mapping):
+            raise ValueError("Section 'listener' must be a mapping")
+        listener = dict(cast(Mapping[str, Any], listener_raw))
+
+        wake_models_raw = listener.get("wake_models", [])
+        if wake_models_raw is None:
+            wake_models: list[str] = []
+        elif isinstance(wake_models_raw, str) or not isinstance(wake_models_raw, Sequence):
+            raise ValueError("listener.wake_models must be a sequence of strings")
+        else:
+            wake_models = [str(x) for x in cast(Sequence[Any], wake_models_raw)]
+
+        wake_download_models_raw = listener.get("wake_download_models", [])
+        if wake_download_models_raw is None:
+            wake_download_models: list[str] = []
+        elif isinstance(wake_download_models_raw, str) or not isinstance(wake_download_models_raw, Sequence):
+            raise ValueError("listener.wake_download_models must be a sequence of strings")
+        else:
+            wake_download_models = [str(x) for x in cast(Sequence[Any], wake_download_models_raw)]
+
+        wake_model_dir_raw = listener.get("wake_model_dir")
+        wake_model_dir = str(Path(str(wake_model_dir_raw)).expanduser()) if wake_model_dir_raw else ""
+        self.listener: dict[str, Any] = {
+            "wake_window_seconds": float(listener.get("wake_window_seconds", 2.0)),
+            "wake_frame_ms": int(listener.get("wake_frame_ms", 80)),
+            "wake_threshold": float(listener.get("wake_threshold", 0.5)),
+            "wake_models": wake_models,
+            "wake_model_dir": wake_model_dir,
+            "wake_download_models": wake_download_models,
+            "vad_threshold": float(listener.get("vad_threshold", 0.5)),
+            "vad_min_silence_ms": int(listener.get("vad_min_silence_ms", 250)),
+            "vad_speech_pad_ms": int(listener.get("vad_speech_pad_ms", 30)),
+            "armed_timeout_seconds": float(listener.get("armed_timeout_seconds", 5.0)),
+            "max_utterance_seconds": float(listener.get("max_utterance_seconds", 20.0)),
+            "end_hangover_ms": int(listener.get("end_hangover_ms", 300)),
+        }
+
     @staticmethod
     def _load_yaml(path: Path) -> dict[str, Any]:
         if not path.exists():
@@ -117,6 +157,7 @@ class Config:
         return value
 
 
-config = Config()
+def load_config() -> Config:
+    return Config()
 
 

@@ -2,23 +2,27 @@ import subprocess
 import numpy as np
 from uuid import uuid4
 from pathlib import Path
-
-from recorder_transcriber.config import config
 from recorder_transcriber.model import Recording
 
 
 class AudioConverterAdapter:
 
-    def __init__(self) -> None:
-        ff = config.ffmpeg
-        self.ffmpeg_bin: str = str(ff["binary"])
-        self.input_format: str = str(ff["input_format"])
-        self.sample_rate: int = int(ff["sample_rate"])
-        self.channels: int = int(ff["channels"])
-        self.output_codec: str = str(ff["output_codec"])
-        self.audio_format: str = str(ff["audio_format"])
-        self.dtype: str = str(ff["dtype"])
-        self.tmp_dir = Path(config.tmp_dir)
+    def __init__(
+        self,
+        *,
+        ffmpeg_bin: str,
+        input_format: str,
+        output_codec: str,
+        audio_format: str,
+        dtype: str,
+        tmp_dir: str | Path,
+    ) -> None:
+        self.ffmpeg_bin = str(ffmpeg_bin)
+        self.input_format = str(input_format)
+        self.output_codec = str(output_codec)
+        self.audio_format = str(audio_format)
+        self.dtype = str(dtype)
+        self.tmp_dir = Path(tmp_dir)
 
     def save_recording(self, recording: Recording) -> Recording:
         data = recording.data
