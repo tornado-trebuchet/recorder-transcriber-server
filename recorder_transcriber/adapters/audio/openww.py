@@ -1,40 +1,43 @@
 import numpy as np
-from openwakeword.model import Model # type: ignore
+from openwakeword.model import Model  # type: ignore
 
-from recorder_transcriber.model import WakeResult
-
-class OpenWakeWordAdapter:
-	def __init__(
-		self,
-		*,
-		wakeword_models: list[str] | None = None,
-		threshold: float = 0.5,
-	) -> None:
-		models = [str(m) for m in wakeword_models] if wakeword_models else None
-		self._model = Model(wakeword_models=models)
-		self._threshold = float(threshold)
-
-	def predict(self, frame_pcm16: np.ndarray) -> WakeResult:
-		pcm = _as_pcm16_mono(frame_pcm16)
-		pred = self._model.predict(pcm)
-		scores = {str(k): float(v) for k, v in dict(pred).items()}
-		detected = any(score >= self._threshold for score in scores.values())
-		return WakeResult(detected=detected, scores=scores)
+from recorder_transcriber.domain.models import AudioFrame, WakeEvent
+from recorder_transcriber.ports.wakeword import WakeWordPort
 
 
-def _as_pcm16_mono(frame: np.ndarray) -> np.ndarray:
-	if frame.ndim == 2:
-		frame = frame.mean(axis=1)
-	elif frame.ndim != 1:
-		raise ValueError("Wake frames must be 1D (mono) or 2D (frames, channels)")
+class OpenWakeWordAdapter(WakeWordPort):
+    """Wake-word detection adapter using OpenWakeWord library."""
 
-	if frame.dtype == np.int16:
-		pcm = frame
-	elif np.issubdtype(frame.dtype, np.floating):
-		# float audio is expected in [-1, 1]
-		pcm = np.clip(frame, -1.0, 1.0)
-		pcm = (pcm * 32767.0).astype(np.int16, copy=False)
-	else:
-		pcm = frame.astype(np.int16, copy=False)
+    def __init__(
+        self,
+        *,
+        wakeword_models: list[str] | None = None,
+        threshold: float = 0.5,
+    ) -> None:
+        models = [str(m) for m in wakeword_models] if wakeword_models else None
+        self._model = Model(wakeword_models=models)
+        self._threshold = float(threshold)
+        self._active_models = models or []
 
-	return np.ascontiguousarray(pcm)
+    @property
+    def active_models(self) -> list[str]:
+        """Return list of active wake-word model names."""
+        return self._active_models.copy()
+
+    def reset(self) -> None:
+        """Reset internal state of the wake-word model."""
+        self._model.reset()
+
+    def detect(self, frame: AudioFrame) -> WakeEvent:
+        """Check for wake-word in the given frame.
+
+        Uses frame.to_mono_int16() for format conversion to PCM16.
+
+        Returns:
+            WakeEvent with detection result and confidence scores.
+        """
+        pcm = frame.to_mono_int16()
+        pred = self._model.predict(np.ascontiguousarray(pcm))
+        scores = {str(k): float(v) for k, v in dict(pred).items()}
+        detected = any(score >= self._threshold for score in scores.values())
+        return WakeEvent(detected=detected, scores=scores)

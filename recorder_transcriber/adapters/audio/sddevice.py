@@ -1,184 +1,169 @@
+from dataclasses import dataclass
+from threading import Lock
 from typing import Any
-
 import queue
+
 import numpy as np
-import sounddevice # type: ignore
-from recorder_transcriber.model import Recording
+import sounddevice  # type: ignore
 
-class AudioRecorderAdapter:
+from recorder_transcriber.domain.models import AudioFormat, AudioFrame
+from recorder_transcriber.ports.audiostream import AudioStreamPort, AudioStreamReader
 
-    def __init__(
-        self,
-        *,
-        samplerate: int,
-        channels: int,
-        blocksize: int,
-        dtype: str,
-        queue_max_chunks: int | None = None,
-    ) -> None:
-        self.samplerate = samplerate
-        self.channels = channels
-        self.blocksize = blocksize
-        self.dtype = dtype
 
-        maxsize = 0 if queue_max_chunks is None else max(0, int(queue_max_chunks))
-        self._queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=maxsize)
-        self._stream: sounddevice.InputStream | None = None
-        self._selected_device_name: str | None = None
+@dataclass(slots=True)
+class _Subscriber:
+    name: str
+    queue: queue.Queue[AudioFrame]
+    closed: bool = False
 
-    def start(self) -> None:
-        if self._stream:
-            return
 
-        self._get_device()
+class _QueueReader(AudioStreamReader):
+    """Concrete AudioStreamReader backed by a thread-safe queue."""
 
-        self._stream = sounddevice.InputStream(
-            samplerate=self.samplerate,
-            channels=self.channels,
-            blocksize=self.blocksize,
-            dtype=self.dtype,
-            callback=self._callback,
-        )
-        self._stream.start()
+    def __init__(self, owner: "SoundDeviceAudioStreamAdapter", subscriber_id: int) -> None:
+        self._owner = owner
+        self._subscriber_id = subscriber_id
 
-    def stop(self) -> Recording | None:
-        """Stop recording, drain queued frames and return a Recording"""
-        input_samplerate: float | None = None
-        stream = self._stream
-        if stream:
-            input_samplerate = getattr(stream, "samplerate", None)
-            try:
-                stream.stop()
-            except Exception:
-                pass
-            try:
-                stream.close()
-            except Exception:
-                pass
-            self._stream = None
-
-        payload = self._drain_queue()
-        if payload is None:
+    def read(self, timeout_seconds: float | None = None) -> AudioFrame | None:
+        subscriber = self._owner._get_subscriber(self._subscriber_id)
+        if subscriber is None or subscriber.closed:
             return None
-        payload = self._resample(payload, input_samplerate)
-        return self._build_recording(payload)
-
-    def is_running(self) -> bool:
-        return self._stream is not None
-
-    def read_chunk(self, timeout_seconds: float | None = None) -> np.ndarray | None:
-        """Return the next queued audio chunk."""
         try:
             if timeout_seconds is None:
-                return self._queue.get_nowait()
-            return self._queue.get(timeout=max(timeout_seconds, 0.0))
+                return subscriber.queue.get()  # Block indefinitely
+            elif timeout_seconds == 0:
+                return subscriber.queue.get_nowait()
+            else:
+                return subscriber.queue.get(timeout=max(float(timeout_seconds), 0.0))
         except queue.Empty:
             return None
 
-    def clear_buffer(self) -> None:
-        while True:
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                break
+    def close(self) -> None:
+        self._owner._close_subscriber(self._subscriber_id)
 
-    def _build_recording(self, payload: np.ndarray) -> Recording:
-        return Recording(
-            data=payload,
-            path=None,
-            sample_rate=self.samplerate,
-            channels=self.channels,
-            dtype=self.dtype,
-            blocksize=self.blocksize,
-            device_name=self._selected_device_name,
-        )
 
-    def _drain_queue(self) -> np.ndarray | None:
-        """Collect all queued chunks and return a single ndarray"""
-        chunks: list[np.ndarray] = []
-        while True:
-            try:
-                chunks.append(self._queue.get_nowait())
-            except queue.Empty:
-                break
+class SoundDeviceAudioStreamAdapter(AudioStreamPort):
+    """Audio capture adapter using sounddevice library.
 
-        if not chunks:
-            return None
+    Implements AudioStreamPort by capturing audio via InputStream and
+    distributing AudioFrame objects to subscribers via pub-sub pattern.
+    """
 
+    def __init__(self, *, audio_format: AudioFormat) -> None:
+        self._format = audio_format
+
+        self._lock = Lock()
+        self._stream: sounddevice.InputStream | None = None
+        self._selected_device_name: str | None = None
+        self._next_subscriber_id = 1
+        self._subscribers: dict[int, _Subscriber] = {}
+        self._frame_sequence = 0
+
+    def audio_format(self) -> AudioFormat:
+        return self._format
+
+    def is_running(self) -> bool:
+        with self._lock:
+            return self._stream is not None
+
+    def start(self) -> None:
+        with self._lock:
+            if self._stream is not None:
+                return
+            self._frame_sequence = 0
+            self._get_device()
+            self._stream = sounddevice.InputStream(
+                samplerate=self._format.sample_rate,
+                channels=self._format.channels,
+                blocksize=self._format.blocksize,
+                dtype=self._format.dtype,
+                callback=self._callback,
+            )
+            self._stream.start()
+
+    def stop(self) -> None:
+        with self._lock:
+            stream = self._stream
+            self._stream = None
+            for sub in self._subscribers.values():
+                sub.closed = True
+                while True:
+                    try:
+                        sub.queue.get_nowait()
+                    except queue.Empty:
+                        break
+            self._subscribers.clear()
+
+        if stream is None:
+            return
         try:
-            return np.vstack(chunks)
-        except ValueError:
-            return np.concatenate([np.atleast_2d(c) for c in chunks], axis=0)
-
-    def _callback(self, indata: np.ndarray, frames: int, time: Any, status: Any) -> None:
-        try:
-            array = indata.copy()
+            stream.stop()
         except Exception:
-            array = np.array(indata, copy=True)
+            pass
         try:
-            self._queue.put_nowait(array)
-        except queue.Full:
+            stream.close()
+        except Exception:
             pass
 
-    def _resample(self, payload: np.ndarray, source_samplerate: float | None = None) -> np.ndarray:
-        """Match ndarray to configured dtype, channels, and samplerate."""
-        if payload.size == 0:
-            return payload.astype(self.dtype, copy=False)
+    def subscribe(self, *, name: str, max_frames: int = 1024) -> AudioStreamReader:
+        """Create a new subscriber that receives audio frames.
 
-        if payload.ndim == 1:
-            working = payload.reshape(-1, 1)
-        elif payload.ndim == 2:
-            working = payload
-        else:
-            raise ValueError("Audio payload must be 1D or 2D")
+        Args:
+            name: Identifier for this subscriber (for debugging/logging).
+            max_frames: Maximum frames to buffer before dropping.
 
-        target_channels = int(self.channels)
-        if target_channels < 1:
-            raise ValueError("Configured channel count must be >= 1")
+        Returns:
+            AudioStreamReader that will receive frames.
+        """
+        maxsize = max(1, int(max_frames))
+        with self._lock:
+            subscriber_id = self._next_subscriber_id
+            self._next_subscriber_id += 1
+            self._subscribers[subscriber_id] = _Subscriber(name=str(name), queue=queue.Queue(maxsize=maxsize))
+        return _QueueReader(self, subscriber_id)
 
-        if working.shape[1] == target_channels:
-            channel_matched = working
-        elif target_channels == 1:
-            channel_matched = working.mean(axis=1, keepdims=True)
-        elif working.shape[1] == 1:
-            channel_matched = np.repeat(working, target_channels, axis=1)
-        else:
-            mono = working.mean(axis=1, keepdims=True)
-            channel_matched = np.repeat(mono, target_channels, axis=1)
+    def _get_subscriber(self, subscriber_id: int) -> _Subscriber | None:
+        with self._lock:
+            return self._subscribers.get(subscriber_id)
 
-        target_samplerate = float(self.samplerate)
-        source_rate = float(source_samplerate) if source_samplerate else target_samplerate
+    def _close_subscriber(self, subscriber_id: int) -> None:
+        with self._lock:
+            sub = self._subscribers.pop(subscriber_id, None)
+            if sub is None:
+                return
+            sub.closed = True
+            while True:
+                try:
+                    sub.queue.get_nowait()
+                except queue.Empty:
+                    break
 
-        if source_rate <= 0:
-            source_rate = target_samplerate
+    def _callback(self, indata: np.ndarray, frames: int, time_info: Any, status: Any) -> None:
+        """Sounddevice callback - wraps raw audio in AudioFrame and distributes."""
+        try:
+            arr = indata.copy()
+        except Exception:
+            arr = np.array(indata, copy=True)
 
-        if abs(source_rate - target_samplerate) <= 1e-6:
-            resampled = channel_matched
-        else:
-            duration = channel_matched.shape[0] / source_rate
-            if duration == 0:
-                resampled = channel_matched
-            else:
-                target_length = max(int(round(duration * target_samplerate)), 1)
-                old_times = np.linspace(0.0, duration, num=channel_matched.shape[0], endpoint=False, dtype=np.float64)
-                new_times = np.linspace(0.0, duration, num=target_length, endpoint=False, dtype=np.float64)
-                resampled = np.empty((target_length, channel_matched.shape[1]), dtype=np.float64)
-                for idx in range(channel_matched.shape[1]):
-                    resampled[:, idx] = np.interp(new_times, old_times, channel_matched[:, idx])
+        with self._lock:
+            seq = self._frame_sequence
+            self._frame_sequence += 1
+            subs = list(self._subscribers.values())
 
-        target_dtype = np.dtype(self.dtype)
-        cast_ready = resampled.astype(np.float64, copy=False)
-        if np.issubdtype(target_dtype, np.integer):
-            info = np.iinfo(target_dtype)
-            cast_ready = np.clip(cast_ready, info.min, info.max)
+        frame = AudioFrame(data=arr, format=self._format, sequence=seq)
 
-        output = cast_ready.astype(target_dtype, copy=False)
-        if target_channels == 1:
-            return output.reshape(-1)
-        return output
+        for sub in subs:
+            if sub.closed:
+                continue
+            try:
+                sub.queue.put_nowait(frame)
+            except queue.Full:
+                # Drop oldest frame if queue is full (backpressure)
+                pass
 
-    def _get_device(self) -> None :
+    def _get_device(self) -> None:
         """Look here for a bug"""
         self._selected_device_name = str(sounddevice.query_devices(0).get("name"))
         index = sounddevice.query_devices('pulse').get("index")
         sounddevice.default.device = index, None
+

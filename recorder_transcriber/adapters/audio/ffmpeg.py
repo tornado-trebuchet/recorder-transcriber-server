@@ -2,7 +2,7 @@ import subprocess
 import numpy as np
 from uuid import uuid4
 from pathlib import Path
-from recorder_transcriber.model import Recording
+from recorder_transcriber.domain.models import Recording
 
 
 class AudioConverterAdapter:

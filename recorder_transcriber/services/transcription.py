@@ -1,19 +1,11 @@
 from dataclasses import dataclass
-from typing import Protocol
 
 from recorder_transcriber.domain.models import Recording, Transcript
-
-
-class SpeechToTextPort(Protocol):
-	"""Interface for speech-to-text models."""
-
-	def transcribe_recording(self, recording: Recording) -> Transcript:
-		...
+from recorder_transcriber.ports.stt import SpeechToTextPort
 
 
 @dataclass(slots=True)
 class TranscriptionService:
-	"""Wraps the speech-to-text adapter behind a simple service boundary."""
 
 	adapter: SpeechToTextPort
 

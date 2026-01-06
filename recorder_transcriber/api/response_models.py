@@ -3,8 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from recorder_transcriber.model import Note, Recording, Transcript
-from recorder_transcriber.services.orchestrator import OrchestratorStatus
+from recorder_transcriber.domain.models import Note, Recording, Transcript
 
 
 class StartRecordingResponse(BaseModel):
@@ -77,23 +76,55 @@ class EnhancementResponse(BaseModel):
 		return cls(body=note.body, title=note.title, tags=note.tags, created_at=note.created_at, recording_id=recording_id)
 
 
-class OrchestratorStatusResponse(BaseModel):
+class ListeningStartResponse(BaseModel):
+	"""Response when listening session starts successfully."""
 	model_config = ConfigDict(extra="forbid")
 
-	running: bool
-	phase: Literal["idle", "armed", "recording", "stopping", "error"]
-	started_at: datetime | None
-	last_wake_at: datetime | None
-	last_recording_id: str | None
-	last_error: str | None
+	status: Literal["listening"] = "listening"
+	state: str
+	started_at: datetime
 
 	@classmethod
-	def from_status(cls, status: OrchestratorStatus) -> "OrchestratorStatusResponse":
+	def from_state(cls, state: str, started_at: datetime) -> "ListeningStartResponse":
+		return cls(state=state, started_at=started_at)
+
+
+class ListeningStatusResponse(BaseModel):
+	"""Response for current listening session status."""
+	model_config = ConfigDict(extra="forbid")
+
+	is_listening: bool
+	state: str
+
+	@classmethod
+	def from_service(cls, is_listening: bool, state: str) -> "ListeningStatusResponse":
+		return cls(is_listening=is_listening, state=state)
+
+
+class ListeningResultResponse(BaseModel):
+	"""Response when listening session completes with a transcription."""
+	model_config = ConfigDict(extra="forbid")
+
+	status: Literal["completed"] = "completed"
+	recording_id: str
+	path: str
+	text: str
+	captured_at: datetime
+	transcribed_at: datetime
+
+	@classmethod
+	def from_result(
+		cls,
+		recording: Recording,
+		transcript: Transcript,
+	) -> "ListeningResultResponse":
+		if recording.path is None:
+			raise ValueError("Recording path is required for API responses")
+		path_str = str(recording.path)
 		return cls(
-			running=status.running,
-			phase=status.phase,
-			started_at=status.started_at,
-			last_wake_at=status.last_wake_at,
-			last_recording_id=status.last_recording_id,
-			last_error=status.last_error,
+			recording_id=path_str,
+			path=path_str,
+			text=transcript.text,
+			captured_at=recording.captured_at,
+			transcribed_at=transcript.generated_at,
 		)

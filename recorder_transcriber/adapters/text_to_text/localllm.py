@@ -9,7 +9,7 @@ from langchain.chat_models import init_chat_model
 from langchain.messages import HumanMessage
 import langchain.agents as lc_agents
 
-from recorder_transcriber.model import Note
+from recorder_transcriber.domain.models import Note, Transcript
 
 create_agent = lc_agents.create_agent
 
@@ -25,7 +25,7 @@ class EnhancedTranscript(BaseModel):
     title: str = Field(description="Crisp, human-friendly summary phrase for the transcript.")
     tags: list[str] = Field(description="3-4 comma-safe topical tag strings ordered by relevance.", min_length=3, max_length=5)
 
-class TextEnhancer:
+class LangchainAdapter:
     def __init__(
         self,
         *,
@@ -53,11 +53,11 @@ class TextEnhancer:
             ),
         )
 
-    def enhance(self, text: str) -> Note:
-        if not text or not text.strip():
+    def enhance(self, transcript: Transcript) -> Note:
+        if not transcript.text or not transcript.text.strip():
             raise ValueError("Text to enhance must be non-empty")
 
-        normalized_text = text.strip()
+        normalized_text = transcript.text.strip()
 
         result = self._agent.invoke({
             "messages": [HumanMessage(content=normalized_text)]

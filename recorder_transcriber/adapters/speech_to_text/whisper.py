@@ -3,7 +3,7 @@ from typing import Any
 
 import numpy as np
 from faster_whisper import WhisperModel # type: ignore
-from recorder_transcriber.model import Recording, Transcript
+from recorder_transcriber.domain.models import Recording, Transcript
 
 
 class WhisperAdapter:
@@ -13,7 +13,7 @@ class WhisperAdapter:
 		model_name: str,
 		device: str,
 		download_root: str | None = None,
-		target_sample_rate: int = 16000,
+		target_sample_rate: int,
 	) -> None:
 		self.model_name = str(model_name)
 		self.device = str(device)

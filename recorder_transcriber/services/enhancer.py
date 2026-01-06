@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from recorder_transcriber.model import Note, Transcript
+from recorder_transcriber.domain.models import Note, Transcript
 
 
 class TextEnhancementPort(Protocol):
