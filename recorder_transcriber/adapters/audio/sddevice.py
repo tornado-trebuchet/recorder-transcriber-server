@@ -6,8 +6,11 @@ import queue
 import numpy as np
 import sounddevice  # type: ignore
 
+from recorder_transcriber.core.logger import get_logger
 from recorder_transcriber.domain.models import AudioFormat, AudioFrame
 from recorder_transcriber.ports.audiostream import AudioStreamPort, AudioStreamReader
+
+logger = get_logger("adapters.audio.sddevice")
 
 
 @dataclass(slots=True)
@@ -58,6 +61,12 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
         self._next_subscriber_id = 1
         self._subscribers: dict[int, _Subscriber] = {}
         self._frame_sequence = 0
+        logger.info(
+            "SoundDevice adapter initialized: sample_rate=%d, channels=%d, blocksize=%d",
+            audio_format.sample_rate,
+            audio_format.channels,
+            audio_format.blocksize,
+        )
 
     def audio_format(self) -> AudioFormat:
         return self._format
@@ -80,11 +89,13 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
                 callback=self._callback,
             )
             self._stream.start()
+            logger.info("Audio stream started on device: %s", self._selected_device_name)
 
     def stop(self) -> None:
         with self._lock:
             stream = self._stream
             self._stream = None
+            subscriber_count = len(self._subscribers)
             for sub in self._subscribers.values():
                 sub.closed = True
                 while True:
@@ -99,11 +110,13 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
         try:
             stream.stop()
         except Exception:
-            pass
+            logger.exception("Error stopping audio stream")
         try:
             stream.close()
         except Exception:
-            pass
+            logger.exception("Error closing audio stream")
+
+        logger.info("Audio stream stopped, cleared %d subscribers", subscriber_count)
 
     def subscribe(self, *, name: str, max_frames: int = 1024) -> AudioStreamReader:
         """Create a new subscriber that receives audio frames.
@@ -120,6 +133,7 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
             subscriber_id = self._next_subscriber_id
             self._next_subscriber_id += 1
             self._subscribers[subscriber_id] = _Subscriber(name=str(name), queue=queue.Queue(maxsize=maxsize))
+        logger.info("New audio subscriber: name=%s, id=%d, max_frames=%d", name, subscriber_id, maxsize)
         return _QueueReader(self, subscriber_id)
 
     def _get_subscriber(self, subscriber_id: int) -> _Subscriber | None:
@@ -137,6 +151,7 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
                     sub.queue.get_nowait()
                 except queue.Empty:
                     break
+        logger.info("Subscriber closed: name=%s, id=%d", sub.name, subscriber_id)
 
     def _callback(self, indata: np.ndarray, frames: int, time_info: Any, status: Any) -> None:
         """Sounddevice callback - wraps raw audio in AudioFrame and distributes."""
@@ -159,11 +174,15 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
                 sub.queue.put_nowait(frame)
             except queue.Full:
                 # Drop oldest frame if queue is full (backpressure)
-                pass
+                logger.debug("Frame dropped for subscriber %s due to backpressure", sub.name)
 
     def _get_device(self) -> None:
-        """Look here for a bug"""
-        self._selected_device_name = str(sounddevice.query_devices(0).get("name"))
-        index = sounddevice.query_devices('pulse').get("index")
-        sounddevice.default.device = index, None
+        """Select audio input device."""
+        try:
+            self._selected_device_name = str(sounddevice.query_devices(0).get("name"))
+            index = sounddevice.query_devices('pulse').get("index")
+            sounddevice.default.device = index, None
+            logger.debug("Selected audio device: %s (index=%s)", self._selected_device_name, index)
+        except Exception:
+            logger.exception("Failed to select audio device, using system default")
 

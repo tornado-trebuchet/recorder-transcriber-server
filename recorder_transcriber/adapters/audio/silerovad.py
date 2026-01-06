@@ -5,8 +5,11 @@ import numpy as np
 from silero_vad import load_silero_vad  # type: ignore
 from silero_vad.utils_vad import VADIterator  # type: ignore
 
+from recorder_transcriber.core.logger import get_logger
 from recorder_transcriber.domain.models import AudioFrame, VadEvent
 from recorder_transcriber.ports.vad import VadPort
+
+logger = get_logger("adapters.audio.silerovad")
 
 
 _SILERO_FRAME_SIZE = 512
@@ -27,7 +30,12 @@ class SileroVadAdapter(VadPort):
         speech_pad_ms: int = 30,
         sampling_rate: int = 16000,
     ) -> None:
-        model = load_silero_vad()
+        try:
+            model = load_silero_vad()
+        except Exception:
+            logger.exception("Failed to load Silero VAD model")
+            raise
+
         self._sampling_rate = int(sampling_rate)
         self._iterator = VADIterator(
             model,
@@ -39,6 +47,13 @@ class SileroVadAdapter(VadPort):
         # Internal buffer for accumulating samples to reach 512
         self._buffer: deque[np.ndarray] = deque()
         self._buffer_samples = 0
+
+        logger.info(
+            "SileroVAD adapter initialized: threshold=%.2f, min_silence=%dms, sample_rate=%d",
+            threshold,
+            min_silence_duration_ms,
+            sampling_rate,
+        )
 
     @property
     def required_frame_size(self) -> int | None:
@@ -63,12 +78,18 @@ class SileroVadAdapter(VadPort):
         mono = frame.to_mono_float32()
         self._buffer.append(mono)
         self._buffer_samples += mono.shape[0]
+        logger.debug("VAD processing frame seq=%d, buffer_samples=%d", frame.sequence, self._buffer_samples)
 
         # Process all complete 512-sample chunks
+        # Prioritize "end" events to ensure speech end transitions are never missed
         last_event: VadEvent | None = None
         for chunk in self._emit_chunks():
             event = self._process_chunk(chunk)
             if event is not None:
+                # If we already have an "end" event, don't overwrite it
+                # This ensures speech end detection takes priority
+                if last_event is not None and not last_event.detected:
+                    continue
                 last_event = event
 
         return last_event
@@ -99,7 +120,9 @@ class SileroVadAdapter(VadPort):
         if event is None:
             return None
         if "start" in event:
+            logger.info("Speech start detected")
             return VadEvent(detected=True)
         if "end" in event:
+            logger.info("Speech end detected")
             return VadEvent(detected=False)
         return None

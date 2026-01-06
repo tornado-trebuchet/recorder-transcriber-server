@@ -21,7 +21,7 @@ recording:
     max_duration_seconds: 300
 
 whisper:
-    model: base
+    model: medium
     device: cuda
     download_root: ~/.cache/huggingface
 
@@ -38,9 +38,18 @@ listener:
     wake_threshold: 0.5
     wake_models: [alexa]
     wake_model_dir: ./scripts/openww/models/
-    vad_threshold: 0.5
-    vad_min_silence_ms: 250
-    vad_speech_pad_ms: 30
+    wake_melspec_model: melspectrogram.tflite
+    wake_embedding_model: embedding_model.tflite
+    vad_threshold: 0.30
+    vad_min_silence_ms: 1300
+    vad_speech_pad_ms: 250
     armed_timeout_seconds: 5.0
-    max_utterance_seconds: 20.0
-    end_hangover_ms: 300
+    max_utterance_seconds: 30.0
+    end_hangover_ms: 500
+
+logging:
+    level: DEBUG
+    format: "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+    json_output: false
+    rotate_max_bytes: 10485760  # 10 MB
+    rotate_backup_count: 5

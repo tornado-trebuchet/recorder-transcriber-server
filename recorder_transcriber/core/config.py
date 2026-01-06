@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -78,6 +79,8 @@ class ListenerConfig(BaseModel):
     wake_threshold: float
     wake_models: list[str]
     wake_model_dir: Path
+    wake_melspec_model: str
+    wake_embedding_model: str
     vad_threshold: float
     vad_min_silence_ms: int
     vad_speech_pad_ms: int
@@ -91,6 +94,19 @@ class ListenerConfig(BaseModel):
         return Path(v).expanduser()
 
 
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+
+class LoggingConfig(BaseModel):
+    """Logging configuration."""
+
+    level: LogLevel = "INFO"
+    format: str = "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+    json_output: bool = False
+    rotate_max_bytes: int = 10 * 1024 * 1024  # 10 MB
+    rotate_backup_count: int = 5
+
+
 class AppConfig(BaseModel):
     """Application configuration loaded from YAML."""
 
@@ -101,6 +117,7 @@ class AppConfig(BaseModel):
     whisper: WhisperConfig
     llm: LLMConfig
     listener: ListenerConfig
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
 class Settings(BaseSettings):

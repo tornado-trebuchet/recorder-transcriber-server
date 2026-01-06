@@ -103,9 +103,16 @@ def get_enhancement_service() -> EnhancementService:
 def get_wakeword_adapter() -> OpenWakeWordAdapter:
     """Get singleton OpenWakeWord adapter for wake-word detection."""
     cfg = get_config()
+    model_dir = cfg.listener.wake_model_dir.resolve()
+    model_paths = [
+        str(model_dir / f"{model}_v0.1.tflite") # this will backfire TODO: put as configurable parameter
+        for model in cfg.listener.wake_models
+    ]
     return OpenWakeWordAdapter(
-        wakeword_models=cfg.listener.wake_models,
+        wakeword_models=model_paths,
         threshold=cfg.listener.wake_threshold,
+        melspec_model_path=str(model_dir / cfg.listener.wake_melspec_model),
+        embedding_model_path=str(model_dir / cfg.listener.wake_embedding_model),
     )
 
 

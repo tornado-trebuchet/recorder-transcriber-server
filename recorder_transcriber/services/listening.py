@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from threading import Event, Lock, Thread
 from typing import Callable
+import time
 
 import numpy as np
 
@@ -123,7 +124,19 @@ class ListenerService:
         if reader is None:
             return
 
+        fmt = self.stream.audio_format()
         utterance_frames: list[AudioFrame] = []
+        pre_roll_frames: list[AudioFrame] = []
+        hangover_frames: list[AudioFrame] = []
+
+        # Calculate buffer sizes based on config
+        frames_per_second = fmt.sample_rate / fmt.blocksize
+        pre_roll_max = max(1, int(self.config.vad_speech_pad_ms / 1000 * frames_per_second) + 5)
+        hangover_max = max(1, int(self.config.end_hangover_ms / 1000 * frames_per_second))
+        max_utterance_frames = int(self.config.max_utterance_seconds * frames_per_second)
+
+        armed_start_time: float | None = None
+        speech_ended = False
 
         while not self._stop.is_set():
             frame = reader.read(timeout_seconds=0.1)
@@ -139,28 +152,81 @@ class ListenerService:
                 if wake_result.detected:
                     with self._lock:
                         self._state = "ARMED"
+                    # Reset VAD state for fresh speech detection
                     self.vad.reset()
+                    pre_roll_frames.clear()
+                    armed_start_time = time.monotonic()
 
             elif current_state == "ARMED":
+                # Check for armed timeout
+                if armed_start_time is not None:
+                    elapsed = time.monotonic() - armed_start_time
+                    if elapsed > self.config.armed_timeout_seconds:
+                        # Timeout - return to IDLE
+                        with self._lock:
+                            self._state = "IDLE"
+                        pre_roll_frames.clear()
+                        armed_start_time = None
+                        self.wake.reset()
+                        self.vad.reset()
+                        continue
+
+                # Buffer frames for pre-roll
+                pre_roll_frames.append(frame)
+                if len(pre_roll_frames) > pre_roll_max:
+                    pre_roll_frames.pop(0)
+
                 # Check for speech start
                 vad_event = self.vad.process(frame)
                 if vad_event is not None and vad_event.detected:
                     with self._lock:
                         self._state = "LISTENING"
-                    utterance_frames = [frame]
+                    # Include pre-roll buffer in utterance
+                    utterance_frames = pre_roll_frames.copy()
+                    pre_roll_frames.clear()
+                    armed_start_time = None
+                    speech_ended = False
+                    hangover_frames.clear()
 
             elif current_state == "LISTENING":
-                # Accumulate frames and check for speech end
+                # Accumulate frames
                 utterance_frames.append(frame)
-                vad_event = self.vad.process(frame)
-                if vad_event is not None and not vad_event.detected:
-                    # Speech ended - process utterance
+
+                # Check for max utterance duration
+                if len(utterance_frames) >= max_utterance_frames:
+                    # Force end recording
                     self._process_utterance(utterance_frames)
                     utterance_frames = []
+                    hangover_frames.clear()
+                    speech_ended = False
                     with self._lock:
                         self._state = "IDLE"
                     self.wake.reset()
                     self.vad.reset()
+                    continue
+
+                # Check for speech end
+                vad_event = self.vad.process(frame)
+                if vad_event is not None and not vad_event.detected:
+                    speech_ended = True
+                    hangover_frames = [frame]
+
+                # If speech ended, collect hangover frames
+                if speech_ended:
+                    # Use sequence comparison to avoid numpy array truth value error
+                    if not any(f.sequence == frame.sequence for f in hangover_frames):
+                        hangover_frames.append(frame)
+                    if len(hangover_frames) >= hangover_max:
+                        # Hangover complete - include hangover frames and process utterance
+                        utterance_frames.extend(hangover_frames)
+                        self._process_utterance(utterance_frames)
+                        utterance_frames = []
+                        hangover_frames.clear()
+                        speech_ended = False
+                        with self._lock:
+                            self._state = "IDLE"
+                        self.wake.reset()
+                        self.vad.reset()
 
     def _process_utterance(self, frames: list[AudioFrame]) -> None:
         """Process captured utterance: save recording, transcribe, invoke callback."""
