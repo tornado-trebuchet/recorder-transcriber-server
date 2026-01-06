@@ -6,8 +6,8 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 
 from recorder_transcriber.core.di import get_audio_stream
-from recorder_transcriber.api import core as core_router
-from recorder_transcriber.api import listening as listening_router
+from recorder_transcriber.api import service_router as core_router
+from recorder_transcriber.api import main_router as listening_router
 
 
 @asynccontextmanager

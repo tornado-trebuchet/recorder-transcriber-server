@@ -12,13 +12,12 @@ class WhisperAdapter:
 		*,
 		model_name: str,
 		device: str,
-		download_root: str | None = None,
+		download_root: Path | None = None,
 		target_sample_rate: int,
 	) -> None:
 		self.model_name = str(model_name)
 		self.device = str(device)
-		dl = "" if download_root is None else str(download_root)
-		self.download_root = dl
+		self.download_root = download_root
 		self._model: Any = None
 		self.target_sample_rate = int(target_sample_rate)
 

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from recorder_transcriber.core.config import Config
+from recorder_transcriber.core.config import AppConfig, load_config
 from recorder_transcriber.domain.models import AudioFormat
 from recorder_transcriber.adapters.audio.sddevice import SoundDeviceAudioStreamAdapter
 from recorder_transcriber.adapters.audio.ffmpeg import AudioConverterAdapter
@@ -15,11 +15,9 @@ from recorder_transcriber.services.listening import ListenerService
 
 
 @lru_cache(maxsize=1)
-def get_config() -> Config:
-    """Get singleton Config instance with all settings loaded."""
-    config = Config()
-    config.load_core()
-    return config
+def get_config() -> AppConfig:
+    """Get singleton AppConfig instance."""
+    return load_config()
 
 
 @lru_cache(maxsize=1)
@@ -27,10 +25,10 @@ def get_audio_format() -> AudioFormat:
     """Get AudioFormat from config."""
     cfg = get_config()
     return AudioFormat(
-        sample_rate=cfg.audio["samplerate"],
-        channels=cfg.audio["channels"],
-        blocksize=cfg.audio["blocksize"],
-        dtype=cfg.audio["dtype"],
+        sample_rate=cfg.audio.samplerate,
+        channels=cfg.audio.channels,
+        blocksize=cfg.audio.blocksize,
+        dtype=cfg.audio.dtype,
     )
 
 
@@ -45,12 +43,12 @@ def get_storage_adapter() -> AudioConverterAdapter:
     """Get singleton audio storage/converter adapter."""
     cfg = get_config()
     return AudioConverterAdapter(
-        ffmpeg_bin=cfg.ffmpeg["binary"],
-        input_format=cfg.ffmpeg["input_format"],
-        output_codec=cfg.ffmpeg["output_codec"],
-        audio_format=cfg.ffmpeg["audio_format"],
-        dtype=cfg.ffmpeg["dtype"],
-        tmp_dir=cfg.tmp_dir,
+        ffmpeg_bin=cfg.ffmpeg.binary,
+        input_format=cfg.ffmpeg.input_format,
+        output_codec=cfg.ffmpeg.output_codec,
+        audio_format=cfg.ffmpeg.audio_format,
+        dtype=cfg.ffmpeg.dtype,
+        tmp_dir=cfg.paths.tmp_dir,
     )
 
 
@@ -59,10 +57,10 @@ def get_whisper_adapter() -> WhisperAdapter:
     """Get singleton Whisper STT adapter."""
     cfg = get_config()
     return WhisperAdapter(
-        model_name=cfg.whisper["model"],
-        device=cfg.whisper["device"],
-        download_root=cfg.whisper["download_root"],
-        target_sample_rate=cfg.audio["samplerate"],
+        model_name=cfg.whisper.model,
+        device=cfg.whisper.device,
+        download_root=cfg.whisper.download_root,
+        target_sample_rate=cfg.audio.samplerate,
     )
 
 
@@ -71,10 +69,10 @@ def get_llm_adapter() -> LangchainAdapter:
     """Get singleton LLM adapter for enhancement."""
     cfg = get_config()
     return LangchainAdapter(
-        base_url=cfg.llm["base_url"],
-        model=cfg.llm["model"],
-        temperature=cfg.llm["temperature"],
-        timeout=cfg.llm["timeout"],
+        base_url=cfg.llm.base_url,
+        model=cfg.llm.model,
+        temperature=cfg.llm.temperature,
+        timeout=cfg.llm.timeout,
     )
 
 
@@ -85,7 +83,7 @@ def get_recorder_service() -> RecorderService:
     return RecorderService(
         stream=get_audio_stream(),
         storage_adapter=get_storage_adapter(),
-        max_duration_seconds=cfg.recording_max_seconds,
+        max_duration_seconds=cfg.recording.max_duration_seconds,
     )
 
 
@@ -105,11 +103,9 @@ def get_enhancement_service() -> EnhancementService:
 def get_wakeword_adapter() -> OpenWakeWordAdapter:
     """Get singleton OpenWakeWord adapter for wake-word detection."""
     cfg = get_config()
-    wake_models = cfg.listener.get("wake_models")
-    threshold = cfg.listener.get("wake_threshold", 0.5)
     return OpenWakeWordAdapter(
-        wakeword_models=wake_models,
-        threshold=threshold,
+        wakeword_models=cfg.listener.wake_models,
+        threshold=cfg.listener.wake_threshold,
     )
 
 
@@ -117,12 +113,11 @@ def get_wakeword_adapter() -> OpenWakeWordAdapter:
 def get_vad_adapter() -> SileroVadAdapter:
     """Get singleton Silero VAD adapter for voice activity detection."""
     cfg = get_config()
-    audio_cfg = cfg.audio
     return SileroVadAdapter(
-        threshold=cfg.listener["vad_threshold"],
-        min_silence_duration_ms=cfg.listener["vad_min_silence_ms"],
-        speech_pad_ms=cfg.listener["vad_speech_pad_ms"],
-        sampling_rate=audio_cfg["samplerate"],
+        threshold=cfg.listener.vad_threshold,
+        min_silence_duration_ms=cfg.listener.vad_min_silence_ms,
+        speech_pad_ms=cfg.listener.vad_speech_pad_ms,
+        sampling_rate=cfg.audio.samplerate,
     )
 
 

@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 from threading import Event, Lock, Thread
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 
+from recorder_transcriber.core.config import ListenerConfig
 from recorder_transcriber.domain.models import AudioFrame, ListeningResult, Recording
 from recorder_transcriber.ports.audiostream import AudioStreamPort, AudioStreamReader
 from recorder_transcriber.ports.vad import VadPort
@@ -25,7 +26,7 @@ class ListenerService:
     stream: AudioStreamPort
     wake: WakeWordPort
     vad: VadPort
-    config: dict[str, Any]
+    config: ListenerConfig
     storage: AudioStoragePort | None = None
     stt: SpeechToTextPort | None = None
 

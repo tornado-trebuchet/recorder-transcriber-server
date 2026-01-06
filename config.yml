@@ -1,3 +1,7 @@
+paths:
+    tmp_dir: /tmp/recorder-transcriber-server
+    fs_dir: ~/.local/share/recorder-transcriber-server
+
 ffmpeg:
     binary: ffmpeg
     input_format: f32le
@@ -17,7 +21,7 @@ recording:
     max_duration_seconds: 300
 
 whisper:
-    model: medium
+    model: base
     device: cuda
     download_root: ~/.cache/huggingface
 
@@ -25,6 +29,8 @@ llm:
     base_url: http://localhost:1641/v1
     model: gpt-4o-mini
     temperature: 0.2
+    max_tokens: 800
+    timeout: 30
 
 listener:
     wake_window_seconds: 2.0
