@@ -76,36 +76,29 @@ class EnhancementResponse(BaseModel):
 		return cls(body=note.body, title=note.title, tags=note.tags, created_at=note.created_at, recording_id=recording_id)
 
 
-class ListeningStartResponse(BaseModel):
-	"""Response when listening session starts successfully."""
+# WebSocket message models for listening service
+
+class WsCommand(BaseModel):
+	"""Incoming WebSocket command from client."""
 	model_config = ConfigDict(extra="forbid")
 
-	status: Literal["listening"] = "listening"
+	action: Literal["start", "stop"]
+
+
+class WsStateEvent(BaseModel):
+	"""WebSocket event for state changes."""
+	model_config = ConfigDict(extra="forbid")
+
+	type: Literal["state_change"] = "state_change"
 	state: str
-	started_at: datetime
-
-	@classmethod
-	def from_state(cls, state: str, started_at: datetime) -> "ListeningStartResponse":
-		return cls(state=state, started_at=started_at)
+	timestamp: datetime
 
 
-class ListeningStatusResponse(BaseModel):
-	"""Response for current listening session status."""
+class WsResultEvent(BaseModel):
+	"""WebSocket event when utterance is captured and transcribed."""
 	model_config = ConfigDict(extra="forbid")
 
-	is_listening: bool
-	state: str
-
-	@classmethod
-	def from_service(cls, is_listening: bool, state: str) -> "ListeningStatusResponse":
-		return cls(is_listening=is_listening, state=state)
-
-
-class ListeningResultResponse(BaseModel):
-	"""Response when listening session completes with a transcription."""
-	model_config = ConfigDict(extra="forbid")
-
-	status: Literal["completed"] = "completed"
+	type: Literal["result"] = "result"
 	recording_id: str
 	path: str
 	text: str
@@ -113,13 +106,9 @@ class ListeningResultResponse(BaseModel):
 	transcribed_at: datetime
 
 	@classmethod
-	def from_result(
-		cls,
-		recording: Recording,
-		transcript: Transcript,
-	) -> "ListeningResultResponse":
+	def from_result(cls, recording: Recording, transcript: Transcript) -> "WsResultEvent":
 		if recording.path is None:
-			raise ValueError("Recording path is required for API responses")
+			raise ValueError("Recording path is required for WebSocket result events")
 		path_str = str(recording.path)
 		return cls(
 			recording_id=path_str,
@@ -128,3 +117,20 @@ class ListeningResultResponse(BaseModel):
 			captured_at=recording.captured_at,
 			transcribed_at=transcript.generated_at,
 		)
+
+
+class WsErrorEvent(BaseModel):
+	"""WebSocket event for errors."""
+	model_config = ConfigDict(extra="forbid")
+
+	type: Literal["error"] = "error"
+	message: str
+	timestamp: datetime
+
+
+class WsConnectedEvent(BaseModel):
+	"""WebSocket event sent on successful connection."""
+	model_config = ConfigDict(extra="forbid")
+
+	type: Literal["connected"] = "connected"
+	message: str = "WebSocket connected. Send {\"action\": \"start\"} to begin listening."
