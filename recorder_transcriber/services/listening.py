@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 
-from recorder_transcriber.core.config import ListenerConfig
+from recorder_transcriber.core.settings import ListenerConfig
 from recorder_transcriber.domain.models import AudioFrame, ListeningResult, Recording
 from recorder_transcriber.ports.audiostream import AudioStreamPort, AudioStreamReader
 from recorder_transcriber.ports.vad import VadPort
@@ -27,7 +27,7 @@ class ListenerService:
     stream: AudioStreamPort
     wake: WakeWordPort
     vad: VadPort
-    config: ListenerConfig
+    config: ListenerConfig # FIXME: should not be here 
     storage: AudioStoragePort | None = None
     stt: SpeechToTextPort | None = None
 

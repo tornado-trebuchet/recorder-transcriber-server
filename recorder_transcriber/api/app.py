@@ -1,5 +1,3 @@
-"""FastAPI application for the recorder-transcriber service."""
-
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 

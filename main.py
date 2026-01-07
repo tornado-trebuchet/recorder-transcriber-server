@@ -1,7 +1,7 @@
 import uvicorn
 
 from recorder_transcriber.api import app
-from recorder_transcriber.core.config import load_config
+from recorder_transcriber.core.settings import load_config
 from recorder_transcriber.core.logger import setup_logging
 
 

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from recorder_transcriber.core.config import AppConfig, load_config
+from recorder_transcriber.core.settings import AppConfig, load_config
 from recorder_transcriber.domain.models import AudioFormat
 from recorder_transcriber.adapters.audio.sddevice import SoundDeviceAudioStreamAdapter
 from recorder_transcriber.adapters.audio.ffmpeg import AudioConverterAdapter

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from recorder_transcriber.core.config import LoggingConfig
+from recorder_transcriber.core.settings import LoggingConfig
 
 # Root logger name for the application
 ROOT_LOGGER_NAME = "recorder_transcriber"
