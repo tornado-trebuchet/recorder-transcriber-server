@@ -21,9 +21,10 @@ recording:
     max_duration_seconds: 300
 
 whisper:
-    model: medium
+    model: base
     device: cuda
     download_root: ~/.cache/huggingface
+    resource_management: true 
 
 llm:
     base_url: http://localhost:1641/v1

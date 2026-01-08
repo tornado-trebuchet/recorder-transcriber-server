@@ -60,6 +60,7 @@ def get_whisper_adapter() -> WhisperAdapter:
         model_name=cfg.whisper.model,
         device=cfg.whisper.device,
         download_root=cfg.whisper.download_root,
+        resource_management= cfg.whisper.resource_management,
         target_sample_rate=cfg.audio.samplerate,
     )
 

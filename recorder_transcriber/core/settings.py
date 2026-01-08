@@ -52,6 +52,7 @@ class WhisperConfig(BaseModel):
     model: str
     device: str = "cpu"
     download_root: Path | None = None
+    resource_management: bool
 
     @field_validator("download_root", mode="before")
     @classmethod
