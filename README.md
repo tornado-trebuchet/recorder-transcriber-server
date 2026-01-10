@@ -43,4 +43,5 @@ Voice-activated listening with wake-word detection and automatic transcription.
 # Notes  
 - Uses pulse as audio backend (at least looks for pulse devices)
 - Requires a local openai-compatible llm server for enhancement
-- Container is compatible with older cuda versions to run whisper on Nvidia Pascal GPUs (Image is work in progress, currently incompatibilities are raging)
+- Container is compatible with older cuda host versions to run whisper on Nvidia Pascal GPUs -> CUDA version 19.x -> cudnn 9.x for gpu accelerated transcription
+- Can set cpu in config section 

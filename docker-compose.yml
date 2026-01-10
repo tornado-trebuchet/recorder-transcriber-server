@@ -1,0 +1,32 @@
+services:
+  transcriber:
+    image: recorder-transcriber-server:0.1.0
+    build: .
+    runtime: nvidia
+    environment:
+      - DOCKER_BUILDKIT=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - CONFIG_PATH=/app/config.yml
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+    devices:
+      - /dev/snd:/dev/snd
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+      - ./scripts/openww/models:/app/scripts/openww/models:ro
+      - whisper-cache:/root/.cache/huggingface
+      - app-data:/root/.local/share/recorder-transcriber-server
+      - /run/user/1000/pulse:/run/user/1000/pulse
+    ports:
+      - "1643:1643"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  whisper-cache:
+  app-data:
