@@ -1,9 +1,10 @@
+import gc
 from pathlib import Path
 from typing import Any
-import gc
 
 import numpy as np
-from faster_whisper import WhisperModel # type: ignore
+from faster_whisper import WhisperModel  # type: ignore
+
 from recorder_transcriber.domain.models import Recording, Transcript
 
 

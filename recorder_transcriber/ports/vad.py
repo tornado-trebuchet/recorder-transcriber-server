@@ -30,12 +30,3 @@ class VadPort(Protocol):
         processing a complete utterance.
         """
         ...
-
-    @property
-    def required_frame_size(self) -> int | None:
-        """Return required frame size in samples, or None if flexible.
-
-        Some VAD models (e.g., SileroVAD) require fixed frame sizes.
-        If not None, callers should buffer frames to this size.
-        """
-        ...

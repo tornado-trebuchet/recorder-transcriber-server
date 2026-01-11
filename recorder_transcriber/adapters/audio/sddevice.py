@@ -1,7 +1,7 @@
+import queue
 from dataclasses import dataclass
 from threading import Lock
 from typing import Any
-import queue
 
 import numpy as np
 import sounddevice  # type: ignore
@@ -21,7 +21,6 @@ class _Subscriber:
 
 
 class _QueueReader(AudioStreamReader):
-    """Concrete AudioStreamReader backed by a thread-safe queue."""
 
     def __init__(self, owner: "SoundDeviceAudioStreamAdapter", subscriber_id: int) -> None:
         self._owner = owner
@@ -46,11 +45,6 @@ class _QueueReader(AudioStreamReader):
 
 
 class SoundDeviceAudioStreamAdapter(AudioStreamPort):
-    """Audio capture adapter using sounddevice library.
-
-    Implements AudioStreamPort by capturing audio via InputStream and
-    distributing AudioFrame objects to subscribers via pub-sub pattern.
-    """
 
     def __init__(self, *, audio_format: AudioFormat) -> None:
         self._format = audio_format
@@ -119,15 +113,7 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
         logger.info("Audio stream stopped, cleared %d subscribers", subscriber_count)
 
     def subscribe(self, *, name: str, max_frames: int = 1024) -> AudioStreamReader:
-        """Create a new subscriber that receives audio frames.
-
-        Args:
-            name: Identifier for this subscriber (for debugging/logging).
-            max_frames: Maximum frames to buffer before dropping.
-
-        Returns:
-            AudioStreamReader that will receive frames.
-        """
+ 
         maxsize = max(1, int(max_frames))
         with self._lock:
             subscriber_id = self._next_subscriber_id
@@ -154,7 +140,6 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
         logger.info("Subscriber closed: name=%s, id=%d", sub.name, subscriber_id)
 
     def _callback(self, indata: np.ndarray, frames: int, time_info: Any, status: Any) -> None:
-        """Sounddevice callback - wraps raw audio in AudioFrame and distributes."""
         try:
             arr = indata.copy()
         except Exception:
@@ -173,11 +158,9 @@ class SoundDeviceAudioStreamAdapter(AudioStreamPort):
             try:
                 sub.queue.put_nowait(frame)
             except queue.Full:
-                # Drop oldest frame if queue is full (backpressure)
                 logger.debug("Frame dropped for subscriber %s due to backpressure", sub.name)
 
     def _get_device(self) -> None:
-        """Select audio input device."""
         try:
             self._selected_device_name = str(sounddevice.query_devices(0).get("name"))
             index = sounddevice.query_devices('pulse').get("index")

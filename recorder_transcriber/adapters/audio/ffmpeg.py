@@ -73,6 +73,7 @@ class AudioConverterAdapter:
         ]
 
         logger.debug("Executing FFmpeg command: %s", " ".join(ffmpeg_cmd))
+
         proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdin_bytes = data.tobytes()
         _, stderr = proc.communicate(input=stdin_bytes)
@@ -82,6 +83,8 @@ class AudioConverterAdapter:
             raise RuntimeError(f"ffmpeg failed: {stderr.decode(errors='replace')}")
 
         logger.info("Recording saved successfully: %s", out_path)
+
         recording.path = out_path
         recording.clear_data()
+        
         return recording

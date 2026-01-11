@@ -1,15 +1,7 @@
-"""API router for core recording, transcription, and enhancement endpoints."""
-
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from recorder_transcriber.core.di import (
-    get_enhancement_service,
-    get_recorder_service,
-    get_transcription_service,
-)
-from recorder_transcriber.domain.models import Transcript
 from recorder_transcriber.api.response_models import (
     EnhancementRequest,
     EnhancementResponse,
@@ -18,10 +10,15 @@ from recorder_transcriber.api.response_models import (
     TranscriptionRequest,
     TranscriptResponse,
 )
+from recorder_transcriber.core.di import (
+    get_enhancement_service,
+    get_recorder_service,
+    get_transcription_service,
+)
+from recorder_transcriber.domain.models import Transcript
 from recorder_transcriber.services.enhancement import EnhancementService
 from recorder_transcriber.services.recording import RecorderService
 from recorder_transcriber.services.transcription import TranscriptionService
-
 
 router = APIRouter(tags=["recording"])
 

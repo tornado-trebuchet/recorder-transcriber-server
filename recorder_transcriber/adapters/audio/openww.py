@@ -9,7 +9,6 @@ logger = get_logger("adapters.audio.openww")
 
 
 class OpenWakeWordAdapter(WakeWordPort):
-    """Wake-word detection adapter using OpenWakeWord library."""
 
     def __init__(
         self,
@@ -34,6 +33,7 @@ class OpenWakeWordAdapter(WakeWordPort):
 
         self._threshold = float(threshold)
         self._active_models = models or []
+        
         logger.info(
             "OpenWakeWord adapter initialized: models=%s, threshold=%.2f",
             self._active_models,
@@ -42,26 +42,21 @@ class OpenWakeWordAdapter(WakeWordPort):
 
     @property
     def active_models(self) -> list[str]:
-        """Return list of active wake-word model names."""
         return self._active_models.copy()
 
     def reset(self) -> None:
-        """Reset internal state of the wake-word model."""
         self._model.reset()
 
     def detect(self, frame: AudioFrame) -> WakeEvent:
-        """Check for wake-word in the given frame.
-
-        Uses frame.to_mono_int16() for format conversion to PCM16.
-
-        Returns:
-            WakeEvent with detection result and confidence scores.
-        """
         pcm = frame.to_mono_int16()
+
         logger.debug("Processing frame seq=%d for wake-word detection", frame.sequence)
+
         pred = self._model.predict(np.ascontiguousarray(pcm))
         scores = {str(k): float(v) for k, v in dict(pred).items()}
         detected = any(score >= self._threshold for score in scores.values())
+
         if detected:
             logger.info("Wake-word detected! scores=%s", scores)
+
         return WakeEvent(detected=detected, scores=scores)

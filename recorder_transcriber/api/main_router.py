@@ -1,9 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
-from recorder_transcriber.core.di import get_listener_service
 from recorder_transcriber.api.response_models import (
     WsCommand,
     WsConnectedEvent,
@@ -11,14 +10,14 @@ from recorder_transcriber.api.response_models import (
     WsResultEvent,
     WsStateEvent,
 )
+from recorder_transcriber.core.di import get_listener_service
 from recorder_transcriber.services.listening import ListenerEvent
-
 
 router = APIRouter(prefix="/listen", tags=["listening"])
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @router.websocket("/ws")

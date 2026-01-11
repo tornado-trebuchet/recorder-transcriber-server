@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from recorder_transcriber.domain.models import Note, Recording, Transcript
 
@@ -73,7 +73,12 @@ class EnhancementResponse(BaseModel):
 
 	@classmethod
 	def from_note(cls, note: Note, recording_id: str | None = None) -> "EnhancementResponse":
-		return cls(body=note.body, title=note.title, tags=note.tags, created_at=note.created_at, recording_id=recording_id)
+		return cls(	
+			body=note.body, 
+			title=note.title, 
+			tags=note.tags, 
+			created_at=note.created_at, 
+			recording_id=recording_id)
 
 
 # WebSocket message models for listening service
